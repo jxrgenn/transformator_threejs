@@ -1,30 +1,32 @@
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
-import { useScroll, MeshTransmissionMaterial, Float, Instances, Instance, Text, RoundedBox, Sparkles } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
+import { useScroll, Float, Instances, Instance, Text, Sparkles } from '@react-three/drei';
 
 // --- THEME COLORS ---
 const THEME = {
-    primary: "#1a5fb4", // Darker Electric Blue
-    secondary: "#0d2b4a", // Deep Midnight
-    highlight: "#62a0ea", // Soft Blue Highlight
-    glass: "#cce0ff",
-    wireframe: "#142840"
+    primary: "#1a2e4d", // Dark Slate
+    secondary: "#0b1019", // Deep Void
+    highlight: "#406080", // Steel Blue
+    accent: "#3b82f6", // Electric Royal Blue
+    energy: "#ffffff", // Pure white for tiny hot spots
+    text: "#e2e8f0",    // Slate-200
+    subtext: "#94a3b8"  // Slate-400
 }
 
 // --- SHARED TEXT COMPONENT ---
 const SceneText = ({ 
   text, 
   subtext, 
-  position 
+  position,
+  isMobile
 }: { 
   text: string; 
   subtext: string; 
-  position: [number, number, number] 
+  position: [number, number, number];
+  isMobile: boolean;
 }) => {
   const group = useRef<THREE.Group>(null);
-  const titleRef = useRef<THREE.Mesh>(null);
-  const subRef = useRef<THREE.Mesh>(null);
   
   useFrame((state) => {
     if (!group.current) return;
@@ -33,59 +35,73 @@ const SceneText = ({
     group.current.getWorldPosition(worldPos);
     const dist = Math.abs(worldPos.x);
     
-    // Visibility logic with smooth fade
-    const active = dist < 7;
-    const opacity = Math.max(0, 1 - (dist / 10));
+    // Visibility fade
+    const opacity = Math.max(0, 1 - (dist / 9));
+    
+    group.current.children.forEach((child: any) => {
+        if (child.material) {
+            child.material.opacity = opacity;
+            child.material.transparent = true;
+        }
+    });
 
-    if (titleRef.current) {
-        (titleRef.current.material as THREE.MeshBasicMaterial).opacity = opacity;
-        (titleRef.current.material as THREE.MeshBasicMaterial).transparent = true;
-        
-        // Subtle scale animation
-        const targetScale = active ? 1 : 0.8;
-        titleRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
-    }
-
-    if (subRef.current) {
-        (subRef.current.material as THREE.MeshBasicMaterial).opacity = opacity * 0.7; 
-        (subRef.current.material as THREE.MeshBasicMaterial).transparent = true;
-    }
+    group.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
   });
+
+  // Mobile-specific sizing
+  const titleSize = isMobile ? 0.5 : 0.8;
+  const subSize = isMobile ? 0.18 : 0.25;
+  const maxWidth = isMobile ? 3 : 6;
 
   return (
     <group ref={group} position={position}>
       <Text
-        ref={titleRef}
         font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff"
-        fontSize={1.0}
+        fontSize={titleSize}
         letterSpacing={-0.05}
-        color="white"
+        color={THEME.text}
         anchorX="center"
         anchorY="middle"
-        position={[0, 0, 0]}
+        maxWidth={maxWidth}
+        textAlign="center"
       >
-        {text}
+        {text.toUpperCase()}
       </Text>
       <Text
-        ref={subRef}
         font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hjp-Ek-_EeA.woff"
-        fontSize={0.25}
-        letterSpacing={0.2}
-        color={THEME.highlight}
+        fontSize={subSize}
+        letterSpacing={0.05}
+        color={THEME.accent}
         anchorX="center"
-        anchorY="middle"
-        position={[0, -0.8, 0]} // Increased padding
+        anchorY="top"
+        position={[0, -0.6, 0]} 
+        maxWidth={maxWidth}
+        textAlign="center"
+        lineHeight={1.4}
       >
-        {subtext.toUpperCase()}
+        {subtext}
       </Text>
     </group>
   );
 };
 
-// --- STAGE 1: BLUEPRINT (Voxel Cloud) ---
-const BlueprintStage = () => {
+// --- STAGE 1: IDEATION (Chaos Cloud) ---
+const ChaosCloud = () => {
   const group = useRef<THREE.Group>(null);
   
+  const particles = useMemo(() => {
+    return Array.from({ length: 120 }).map(() => ({
+      position: [
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 5
+      ] as [number, number, number],
+      rotation: [Math.random() * Math.PI, Math.random() * Math.PI, 0] as [number, number, number],
+      scale: Math.random() * 0.4 + 0.1,
+      speed: Math.random() * 0.2 + 0.05
+    }));
+  }, []);
+
   useFrame((state) => {
     if (!group.current) return;
     group.current.rotation.y = state.clock.elapsedTime * 0.05;
@@ -93,211 +109,238 @@ const BlueprintStage = () => {
 
   return (
     <group ref={group} position={[-15, 0, 0]}>
-      {/* Grid of Voxels */}
-      <Instances range={200}>
-        <boxGeometry args={[0.15, 0.15, 0.15]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.2} metalness={0.9} />
-        {Array.from({ length: 200 }).map((_, i) => {
-             const x = (Math.random() - 0.5) * 4;
-             const y = (Math.random() - 0.5) * 4;
-             const z = (Math.random() - 0.5) * 4;
-             
-             const snap = 0.5;
-             const sx = Math.round(x / snap) * snap;
-             const sy = Math.round(y / snap) * snap;
-             const sz = Math.round(z / snap) * snap;
-
-             return (
-                <Instance
-                    key={i}
-                    position={[sx, sy, sz]}
-                    rotation={[0, 0, 0]}
-                    scale={Math.random() * 0.5 + 0.5}
-                />
-             );
-        })}
-      </Instances>
-
-      <mesh>
-        <icosahedronGeometry args={[2.5, 1]} />
-        <meshBasicMaterial color={THEME.wireframe} wireframe transparent opacity={0.2} />
-      </mesh>
-      
-      <pointLight color={THEME.primary} intensity={2} distance={10} />
-      <Sparkles count={50} scale={5} size={2} speed={0.4} opacity={0.3} color={THEME.primary} />
+       <Instances range={120}>
+         <tetrahedronGeometry args={[0.2, 0]} />
+         <meshStandardMaterial color={THEME.highlight} roughness={0.6} metalness={0.5} />
+         {particles.map((p, i) => <FloatingVoxel key={i} {...p} />)}
+       </Instances>
+       <pointLight color={THEME.primary} intensity={0.5} distance={8} />
     </group>
   );
 };
 
-// --- STAGE 2: ATOM BRAIN (The Engine) ---
-// A hybrid atom/brain structure representing the JXSoft Engine
-const AtomBrain = () => {
-  const ringsRef = useRef<THREE.Group>(null);
-  const coreRef = useRef<THREE.Mesh>(null);
+const FloatingVoxel = ({ position, rotation, scale, speed }: any) => {
+    const ref = useRef<THREE.Object3D>(null);
+    useFrame((state) => {
+        if (!ref.current) return;
+        const t = state.clock.elapsedTime;
+        ref.current.position.y = position[1] + Math.sin(t * speed + position[0]) * 0.2;
+        ref.current.rotation.x = rotation[0] + t * speed;
+        ref.current.rotation.y = rotation[1] + t * speed * 0.5;
+    });
+    return <Instance ref={ref} position={position} scale={scale} />;
+}
 
+
+// --- STAGE 2: CREATION (The Neural Engine) ---
+// A sophisticated crystalline processor/brain with many inputs.
+const TheNeuralEngine = () => {
+  const group = useRef<THREE.Group>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
+  
   useFrame((state) => {
-    const t = state.clock.elapsedTime;
-    if (ringsRef.current) {
-        ringsRef.current.rotation.x = t * 0.15;
-        ringsRef.current.rotation.y = t * 0.1;
-    }
-    if (coreRef.current) {
-        // Pulse
-        const scale = 1 + Math.sin(t * 3) * 0.02;
-        coreRef.current.scale.set(scale, scale, scale);
-    }
+      if(!group.current) return;
+      const t = state.clock.elapsedTime;
+      
+      // Floating motion
+      group.current.position.y = Math.sin(t * 0.5) * 0.1;
+      // Gentle compound rotation
+      group.current.rotation.y = t * 0.1; // Slow constant rotation
+      group.current.rotation.z = Math.sin(t * 0.2) * 0.05;
+
+      // Pulse the core
+      if (coreRef.current) {
+        coreRef.current.scale.setScalar(1 + Math.sin(t * 3) * 0.02);
+      }
   });
 
   return (
     <group position={[0, 0, 0]}>
-        {/* Spinning Atomic Rings */}
-        <group ref={ringsRef}>
-            <mesh rotation={[0, 0, 0]}>
-                <torusGeometry args={[3, 0.01, 16, 100]} />
-                <meshBasicMaterial color={THEME.highlight} transparent opacity={0.2} />
-            </mesh>
-            <mesh rotation={[Math.PI/3, 0, 0]}>
-                <torusGeometry args={[2.8, 0.01, 16, 100]} />
-                <meshBasicMaterial color={THEME.secondary} transparent opacity={0.3} />
-            </mesh>
-            <mesh rotation={[-Math.PI/3, 0, 0]}>
-                <torusGeometry args={[2.8, 0.01, 16, 100]} />
-                <meshBasicMaterial color={THEME.primary} transparent opacity={0.2} />
-            </mesh>
-            
-            {/* Particles on rings */}
-            <Instances range={20}>
-                <sphereGeometry args={[0.05, 16, 16]} />
-                <meshBasicMaterial color="#ffffff" toneMapped={false} />
-                {Array.from({ length: 20 }).map((_, i) => (
-                    <Instance 
-                        key={i} 
-                        position={[
-                            3 * Math.cos(i), 
-                            3 * Math.sin(i), 
-                            0
-                        ]} 
-                    />
-                ))}
-            </Instances>
-        </group>
+      <group ref={group}>
+        {/* Central Cortex (Denser, darker core) */}
+        <mesh ref={coreRef}>
+            <dodecahedronGeometry args={[1.2, 0]} />
+            <meshStandardMaterial 
+                color="#050a14" 
+                roughness={0.2} 
+                metalness={1.0} 
+                emissive={THEME.highlight}
+                emissiveIntensity={0.15}
+            />
+        </mesh>
+        
+        {/* Outer Geometric Shell */}
+        <mesh scale={1.1}>
+            <icosahedronGeometry args={[1.2, 1]} />
+            <meshBasicMaterial color={THEME.accent} wireframe transparent opacity={0.05} />
+        </mesh>
 
-        {/* The Brain Core */}
-        <Float speed={5} rotationIntensity={0.5} floatIntensity={0.2}>
-            <mesh ref={coreRef}>
-                <sphereGeometry args={[1.2, 64, 64]} />
-                <meshStandardMaterial 
-                    color="#020202" 
-                    emissive={THEME.primary}
-                    emissiveIntensity={0.6}
-                    roughness={0.2}
-                    metalness={1} 
-                />
-            </mesh>
-            {/* Outer Shell */}
-            <mesh scale={[1.4, 1.4, 1.4]}>
-                <sphereGeometry args={[1, 32, 32]} />
-                <meshBasicMaterial color={THEME.highlight} wireframe transparent opacity={0.05} />
-            </mesh>
-        </Float>
+        {/* Primary Input Nodes (Outer Ring - Ideas entering) */}
+        {Array.from({length: 8}).map((_, i) => {
+            const angle = (i / 8) * Math.PI * 2;
+            const radius = 2.8;
+            return (
+                <group key={`outer-${i}`} rotation={[Math.PI/6, angle, 0]}>
+                     {/* The Node */}
+                     <mesh position={[radius, 0, 0]}>
+                        <octahedronGeometry args={[0.15, 0]} />
+                        <meshStandardMaterial color={THEME.text} emissive={THEME.energy} emissiveIntensity={0.6} />
+                     </mesh>
+                     {/* The Connection Beam */}
+                     <mesh position={[radius/2, 0, 0]} rotation={[0,0,Math.PI/2]}>
+                        <cylinderGeometry args={[0.01, 0.03, radius]} />
+                        <meshBasicMaterial color={THEME.highlight} transparent opacity={0.15} blending={THREE.AdditiveBlending} />
+                     </mesh>
+                     {/* Data Particle flowing in */}
+                     <mesh position={[radius * 0.8, 0, 0]}> 
+                        <boxGeometry args={[0.08, 0.08, 0.08]} />
+                        <meshBasicMaterial color={THEME.accent} />
+                     </mesh>
+                </group>
+            )
+        })}
 
-        <pointLight color={THEME.primary} intensity={4} distance={15} decay={2} />
-        <Sparkles count={100} scale={6} size={2} speed={1} opacity={0.4} color={THEME.highlight} />
+        {/* Secondary Processing Nodes (Inner Ring - Processing) */}
+        {Array.from({length: 12}).map((_, i) => {
+            const angle = (i / 12) * Math.PI * 2;
+            const radius = 1.9;
+            return (
+                <group key={`inner-${i}`} rotation={[-Math.PI/6, angle + 0.2, 0]}>
+                     <mesh position={[radius, 0, 0]}>
+                        <sphereGeometry args={[0.08, 16, 16]} />
+                        <meshStandardMaterial color={THEME.highlight} emissive={THEME.accent} emissiveIntensity={0.4} />
+                     </mesh>
+                     <mesh position={[radius/2, 0, 0]} rotation={[0,0,Math.PI/2]}>
+                        <cylinderGeometry args={[0.005, 0.015, radius]} />
+                        <meshBasicMaterial color={THEME.accent} transparent opacity={0.1} blending={THREE.AdditiveBlending} />
+                     </mesh>
+                </group>
+            )
+        })}
+        
+        {/* Orbiting Ring for structure */}
+        <mesh rotation={[Math.PI/2, 0, 0]}>
+            <torusGeometry args={[2.2, 0.005, 16, 100]} />
+            <meshBasicMaterial color={THEME.primary} transparent opacity={0.2} />
+        </mesh>
+      </group>
+
+      <pointLight color={THEME.accent} intensity={2.5} distance={10} />
+      <Sparkles count={60} scale={6} size={2} speed={0.5} opacity={0.3} color={THEME.accent} />
     </group>
   );
 };
 
-// --- STAGE 3: RESULT STACK (The Product) ---
-const ResultStack = () => {
+
+// --- STAGE 3: IMPACT (The Global Pulse) ---
+// Represents "Changing the World" with shockwaves.
+const TheImpact = () => {
+  const globe = useRef<THREE.Mesh>(null);
+  const shockwave = useRef<THREE.Mesh>(null);
+  const shockwave2 = useRef<THREE.Mesh>(null);
+  
+  useFrame((state) => {
+     const t = state.clock.elapsedTime;
+     
+     if (globe.current) {
+         globe.current.rotation.y = t * 0.2;
+     }
+     
+     // Expand and fade shockwaves
+     if (shockwave.current) {
+         const scale = (t * 1.5) % 3.5;
+         shockwave.current.scale.setScalar(scale);
+         const opacity = Math.max(0, 1 - (scale / 3.5));
+         (shockwave.current.material as THREE.MeshBasicMaterial).opacity = opacity * 0.5;
+     }
+
+     if (shockwave2.current) {
+        const scale = ((t * 1.5) + 1.75) % 3.5;
+        shockwave2.current.scale.setScalar(scale);
+        const opacity = Math.max(0, 1 - (scale / 3.5));
+        (shockwave2.current.material as THREE.MeshBasicMaterial).opacity = opacity * 0.3;
+    }
+  });
+
   return (
     <group position={[15, 0, 0]}>
-      <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
+      <Float speed={1} rotationIntensity={0.1} floatIntensity={0.2}>
         
-        {/* Layer 1: Base */}
-        <group position={[0, -0.6, 0]}>
-            <RoundedBox args={[3, 0.2, 3]} radius={0.05} smoothness={4}>
-                 <meshStandardMaterial color="#080808" metalness={0.9} roughness={0.1} />
-            </RoundedBox>
-        </group>
+        {/* The World Sphere */}
+        <mesh ref={globe}>
+            <icosahedronGeometry args={[1.4, 4]} />
+            <meshStandardMaterial 
+                color={THEME.secondary}
+                metalness={0.8}
+                roughness={0.4}
+                wireframe
+                emissive={THEME.accent}
+                emissiveIntensity={0.1}
+            />
+        </mesh>
+        
+        {/* Solid Core */}
+        <mesh>
+            <sphereGeometry args={[1.0, 32, 32]} />
+            <meshStandardMaterial color="#000000" metalness={1} roughness={0} />
+        </mesh>
 
-        {/* Layer 2: Mid Logic */}
-        <group position={[0, 0, 0]}>
-            <RoundedBox args={[3, 0.2, 3]} radius={0.05} smoothness={4}>
-                 <meshStandardMaterial color="#101010" metalness={0.8} roughness={0.1} />
-            </RoundedBox>
-             <mesh rotation={[Math.PI/2, 0, 0]} position={[0, 0.11, 0]}>
-                 <planeGeometry args={[2.8, 2.8]} />
-                 <meshBasicMaterial color={THEME.primary} wireframe transparent opacity={0.1} />
-            </mesh>
-        </group>
+        {/* Pulse Rings */}
+        <mesh ref={shockwave}>
+            <sphereGeometry args={[1, 32, 32]} />
+            <meshBasicMaterial color={THEME.accent} transparent opacity={0.5} wireframe />
+        </mesh>
+        <mesh ref={shockwave2}>
+            <sphereGeometry args={[1, 32, 32]} />
+            <meshBasicMaterial color={THEME.highlight} transparent opacity={0.3} wireframe />
+        </mesh>
 
-        {/* Layer 3: UI / Top Glass */}
-        <group position={[0, 0.6, 0]}>
-            <RoundedBox args={[3, 0.2, 3]} radius={0.05} smoothness={4}>
-                <MeshTransmissionMaterial 
-                    samples={8}
-                    thickness={0.5}
-                    chromaticAberration={0.05}
-                    anisotropy={0.1}
-                    roughness={0.05}
-                    color="#e0eaff"
-                    toneMapped={false}
-                />
-            </RoundedBox>
-            {/* Glowing Icon Placeholder */}
-            <mesh position={[0, 0.2, 0]} rotation={[Math.PI/2, 0, 0]}>
-                 <ringGeometry args={[0.5, 0.6, 32]} />
-                 <meshBasicMaterial color={THEME.highlight} toneMapped={false} />
-            </mesh>
-        </group>
-
+        {/* Core Light */}
+        <pointLight intensity={2} color={THEME.accent} distance={6} />
       </Float>
-
-      <Sparkles count={80} scale={5} size={2} speed={0.4} opacity={0.4} color={THEME.highlight} />
-      <spotLight position={[5, 10, 5]} angle={0.5} penumbra={1} intensity={8} color="white" />
+      
+      {/* Stars/Dust around the impact */}
+      <Sparkles count={60} scale={6} size={1.5} speed={0.2} opacity={0.4} color={THEME.accent} />
     </group>
   );
 };
 
-// --- CONNECTORS (Node to Node) ---
-
-const DataPulse: React.FC<{ offset: number }> = ({ offset }) => {
+// --- CONNECTORS (Ghost Streams) ---
+const GhostStream: React.FC<{ offset: number }> = ({ offset }) => {
     const ref = useRef<THREE.Mesh>(null);
     
     useFrame((state) => {
         if (!ref.current) return;
-        
-        // Move from -15 to 15
-        const speed = 6;
+        const speed = 15; 
         const totalDist = 30;
         const t = (state.clock.elapsedTime * speed + offset) % totalDist; 
         const currentX = t - 15;
         
         ref.current.position.set(currentX, 0, 0);
         
-        // Visibility logic (fade out at ends)
         const distFromCenter = Math.abs(currentX);
-        const fadeThreshold = 12;
-        let opacity = 1;
+        const fadeThreshold = 14; 
+        let opacity = 0.2; 
         
         if (distFromCenter > fadeThreshold) {
-            opacity = 1 - ((distFromCenter - fadeThreshold) / (15 - fadeThreshold));
+            opacity = 0.2 * (1 - ((distFromCenter - fadeThreshold) / (15 - fadeThreshold)));
         }
         
         const mat = ref.current.material as THREE.MeshBasicMaterial;
-        mat.opacity = Math.max(0, opacity);
+        if(mat) mat.opacity = Math.max(0, opacity);
         
-        // Stretch effect based on movement
-        ref.current.scale.set(1.5, 1, 1);
+        ref.current.scale.x = 2;
     });
 
     return (
         <mesh ref={ref} rotation={[0, 0, Math.PI/2]}>
-            <capsuleGeometry args={[0.04, 0.6, 4, 8]} />
+            <cylinderGeometry args={[0.01, 0.01, 1, 6]} />
             <meshBasicMaterial 
-                color={THEME.highlight} 
+                color={THEME.accent} 
                 transparent 
-                toneMapped={false}
+                opacity={0.1}
+                blending={THREE.AdditiveBlending}
+                depthWrite={false} 
             />
         </mesh>
     );
@@ -306,109 +349,104 @@ const DataPulse: React.FC<{ offset: number }> = ({ offset }) => {
 const NodeConnections = () => {
     return (
         <group>
-            {/* Connection Lines - Extremely faint */}
-            <mesh position={[0, 0, 0]} rotation={[0, 0, Math.PI/2]}>
-                <cylinderGeometry args={[0.02, 0.02, 30]} />
-                <meshBasicMaterial color={THEME.primary} transparent opacity={0.05} />
+            {/* Guide Rail */}
+            <mesh rotation={[0, 0, Math.PI/2]}>
+                <cylinderGeometry args={[0.005, 0.005, 30, 4]} />
+                <meshBasicMaterial color={THEME.primary} transparent opacity={0.15} />
             </mesh>
             
-            {/* Traveling Data Pulses (Individual meshes for stability) */}
-            {Array.from({ length: 5 }).map((_, i) => (
-                <DataPulse key={i} offset={i * 6} />
+            {Array.from({ length: 8 }).map((_, i) => (
+                <GhostStream key={i} offset={i * 3.75} />
             ))}
         </group>
     )
 }
 
-// --- DATA STREAM (Background) ---
-const DataStream = () => {
-  const streamRef = useRef<THREE.Group>(null);
-  const lines = useMemo(() => {
-    return Array.from({ length: 40 }).map((_, i) => {
-        const y = (Math.random() - 0.5) * 12;
-        const width = Math.random() * 0.1;
-        const length = Math.random() * 20 + 10;
-        const speed = Math.random() * 0.5 + 0.2;
-        return { y, width, length, speed, offset: Math.random() * 20 };
-    });
-  }, []);
-
-  useFrame((state) => {
-      if (!streamRef.current) return;
-      streamRef.current.children.forEach((mesh, i) => {
-          const info = lines[i];
-          mesh.position.z = ((state.clock.elapsedTime * 15 * info.speed) + info.offset) % 40 - 20;
-      });
-  });
-
-  return (
-    <group ref={streamRef}>
-        {lines.map((l, i) => (
-             <mesh key={i} position={[ (Math.random()-0.5)*20 , l.y, 0]}>
-                 <boxGeometry args={[0.02, 0.02, l.length]} />
-                 <meshBasicMaterial color="#080808" transparent opacity={0.5} />
-             </mesh>
-        ))}
-    </group>
-  );
-};
+// --- BACKGROUND ---
+const CyberEnvironment = () => {
+    return (
+        <group>
+             {/* Main Grid */}
+             <gridHelper args={[80, 40, "#1e293b", "#0f172a"]} position={[0, -4, 0]} />
+             
+             {/* Distant Starfield for depth */}
+             <Sparkles count={200} scale={40} size={2} speed={0.1} opacity={0.3} color="#ffffff" />
+             
+             {/* Atmospheric Fog */}
+             <fog attach="fog" args={['#020202', 12, 45]} />
+        </group>
+    )
+}
 
 // --- MAIN CONTROLLER ---
 export const ProcessJourney: React.FC = () => {
   const scroll = useScroll();
+  const { viewport } = useThree();
 
   return (
     <group>
       <perspectiveCamera position={[0, 0, 15]} fov={35} />
-      <SceneContent scroll={scroll} />
+      <SceneContent scroll={scroll} viewportWidth={viewport.width} />
     </group>
   );
 };
 
-const SceneContent = ({ scroll }: { scroll: any }) => {
+const SceneContent = ({ scroll, viewportWidth }: { scroll: any, viewportWidth: number }) => {
     const worldRef = useRef<THREE.Group>(null);
+    
+    // --- RESPONSIVE LOGIC ---
+    const isMobile = viewportWidth < 10;
+    const scale = isMobile ? 0.6 : 1.0; 
+    const objectDistance = 15; 
     
     useFrame((state, delta) => {
         if (worldRef.current) {
-            // Scroll Logic: Move world left as user scrolls down
-            const targetX = 15 - (scroll.offset * 30);
+            worldRef.current.scale.set(scale, scale, scale);
+
+            const offset = scroll?.offset || 0;
+            const startX = objectDistance * scale;
+            const endX = -objectDistance * scale;
+            const totalTravel = startX - endX;
             
-            // Damping for smooth movement
-            worldRef.current.position.x = THREE.MathUtils.damp(worldRef.current.position.x, targetX, 2, delta);
+            const targetX = startX - (offset * totalTravel);
             
-            // Depth ease-in-out
-            const depth = Math.sin(scroll.offset * Math.PI) * 2; 
+            worldRef.current.position.x = THREE.MathUtils.damp(worldRef.current.position.x, targetX, 2.5, delta);
+            
+            const depth = Math.sin(offset * Math.PI) * 1.5; 
             worldRef.current.position.z = THREE.MathUtils.damp(worldRef.current.position.z, -depth, 2, delta);
         }
     });
 
     return (
         <group ref={worldRef}>
-            <DataStream />
+            <CyberEnvironment />
             <NodeConnections />
             
-            {/* STAGE 1 */}
-            <BlueprintStage />
+            {/* STAGE 1: IDEATION */}
+            <ChaosCloud />
             <SceneText 
-                position={[-15, -3.5, 0]} 
-                text="YOUR IDEAS" 
-                subtext="And Vision" 
+                position={[-15, -3.0, 0]} 
+                text="Ideation" 
+                subtext="Your ideas and vision" 
+                isMobile={isMobile}
             />
 
-            {/* STAGE 2 */}
-            <AtomBrain />
+            {/* STAGE 2: CREATION */}
+            <TheNeuralEngine />
             <SceneText 
-                position={[0, -4.0, 0]} 
-                text="JXSOFT" 
-                subtext="We make your dreams a reality" 
+                position={[0, -3.0, 0]} 
+                text="Creation" 
+                subtext="We will work hard to bring your vision to life"
+                isMobile={isMobile}
             />
 
-            {/* STAGE 3 */}
-            <ResultStack />
+            {/* STAGE 3: IMPACT */}
+            <TheImpact />
             <SceneText 
-                position={[15, -3.5, 0]} 
-                text="RESULTS" 
-                subtext="Enjoy your vision brought to life" 
+                position={[15, -3.0, 0]} 
+                text="Impact" 
+                subtext="Use your product to change the world"
+                isMobile={isMobile}
             />
         </group>
     )
